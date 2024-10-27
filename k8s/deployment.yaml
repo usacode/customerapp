@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: customerapp-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: customerapp
+  template:
+    metadata:
+      labels:
+        app: customerapp
+    spec:
+      containers:
+        - name: customerapp
+          image: <ecr_registry>/<ecr_repository>:latest
+          ports:
+            - containerPort: 8080
