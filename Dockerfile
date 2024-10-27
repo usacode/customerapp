@@ -2,7 +2,7 @@
 FROM openjdk:17-jdk-slim
 
 # Copy the Spring Boot jar file
-COPY build/libs/0.0.1-customerapp.jar app.jar
+COPY build/libs/customerapp-0.0.1-customerapp.jar app.jar
 
 # Expose the port
 EXPOSE 8080
