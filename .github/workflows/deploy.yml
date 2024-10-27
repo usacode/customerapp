@@ -3,7 +3,7 @@ name: CI/CD Pipeline to AWS EKS
 on:
   push:
     branches:
-      - main  # Run this pipeline on pushes to the main branch
+      - master  # Run this pipeline on pushes to the main branch
 
 jobs:
   build-and-deploy:
