@@ -14,6 +14,6 @@ spec:
     spec:
       containers:
         - name: customerapp
-          image: <ecr_registry>/<ecr_repository>:latest
+          image: 390278047930.dkr.ecr.us-east-1.amazonaws.com/customerapp-repo:latest
           ports:
             - containerPort: 8080
