@@ -9,29 +9,41 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
+    permissions:
+      id-token: write  # Required for OIDC authentication
+      contents: read
+
     steps:
       # Step 1: Checkout the code
       - name: Checkout Code
         uses: actions/checkout@v2
 
-      # Step 2: Make gradlew executable
+      # Step 2: Configure AWS Credentials with OIDC
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::390278047930:role/EKS-Role
+          role-session-name: GitHubActionsOIDC
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # Step 3: Make gradlew executable (for Java projects)
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # Step 3: Set up JDK for building the Spring Boot app
+      # Step 4: Set up JDK for building the Spring Boot app (if applicable)
       - name: Set up JDK 17
         uses: actions/setup-java@v2
         with:
           distribution: 'adopt'
           java-version: '17'
 
-      # Step 4: Build the Spring Boot application JAR and run tests
+      # Step 5: Build the Spring Boot application JAR and run tests
       - name: Build and Run Tests
         run: ./gradlew clean build
         env:
           CI: true  # Ensures Gradle runs in CI mode
 
-      # Step 5: Verify JAR exists in build/libs
+      # Step 6: Verify JAR exists in build/libs
       - name: Verify build/libs directory and JAR file
         run: |
           if [ -d "build/libs" ]; then
@@ -42,47 +54,27 @@ jobs:
             exit 1
           fi
 
-      # Step 6: Log in to Amazon ECR
+      # Step 7: Log in to Amazon ECR
       - name: Log in to Amazon ECR
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
-          aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
-          aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
-          aws configure set region ${{ secrets.AWS_REGION }}
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
 
-      # Step 7: Build the Docker image
+      # Step 8: Build the Docker image
       - name: Build Docker Image
         run: |
           docker build -t ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest .
 
-      # Step 8: Push the Docker image to Amazon ECR
+      # Step 9: Push the Docker image to Amazon ECR
       - name: Push Docker Image to ECR
         run: |
           docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
 
-      # Step 9: Configure AWS CLI and verify authentication
-      - name: Verify AWS CLI authentication
-        run: aws sts get-caller-identity
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-
-      # Step 10: Configure kubectl with EKS kubeconfig and verify configuration
-      - name: Configure kubectl
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      # Step 10: Update kubeconfig for EKS access
+      - name: Configure kubectl with EKS
         run: |
-          aws eks --region ${{ secrets.AWS_REGION }} update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --role-arn arn:aws:iam::390278047930:role/EKS-Role
-          echo "Verifying kubeconfig:"
-          kubectl config view  # Show current kubeconfig for verification
-          kubectl get svc      # Try accessing services as a connectivity test
+          aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name ${{ secrets.EKS_CLUSTER_NAME }}
 
-      # Step 11: Test kubectl connectivity to EKS nodes
+      # Step 11: Test kubectl connectivity
       - name: Test kubectl connectivity
         run: kubectl get nodes
 
