@@ -71,15 +71,18 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
 
-      # Step 10: Configure kubectl with EKS kubeconfig
+      # Step 10: Configure kubectl with EKS kubeconfig and verify configuration
       - name: Configure kubectl
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
           aws eks --region ${{ secrets.AWS_REGION }} update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --role-arn arn:aws:iam::390278047930:role/EKS-Role
+          echo "Verifying kubeconfig:"
+          kubectl config view  # Show current kubeconfig for verification
+          kubectl get svc      # Try accessing services as a connectivity test
 
-      # Step 11: Test kubectl connectivity to EKS
+      # Step 11: Test kubectl connectivity to EKS nodes
       - name: Test kubectl connectivity
         run: kubectl get nodes
 
