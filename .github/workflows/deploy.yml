@@ -3,7 +3,7 @@ name: CI/CD Pipeline to AWS EKS
 on:
   push:
     branches:
-      - main  # Specify the branch to trigger the workflow on (adjust as necessary)
+      - master  # Specify the branch to trigger the workflow.
 
 jobs:
   build-and-deploy:
