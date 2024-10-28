@@ -3,7 +3,7 @@ name: CI/CD Pipeline to AWS EKS
 on:
   push:
     branches:
-      - master  # Specify the branch to trigger the workflow.
+      - master  # Specify the branch to trigger the workflow
 
 jobs:
   build-and-deploy:
@@ -18,24 +18,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v2
 
-      # Step 2: Make gradlew executable (for Java projects)
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-
-      # Step 3: Set up JDK for building the Spring Boot app (if applicable)
-      - name: Set up JDK 17
-        uses: actions/setup-java@v2
-        with:
-          distribution: 'adopt'
-          java-version: '17'
-
-      # Step 4: Build the Spring Boot application JAR and run tests
-      - name: Build and Run Tests
-        run: ./gradlew clean build
-        env:
-          CI: true  # Ensures Gradle runs in CI mode
-
-      # Step 5: Configure AWS Credentials
+      # Step 2: Configure AWS Credentials
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -43,28 +26,46 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # Step 6: Log in to Amazon ECR
+      # Step 3: Test AWS CLI Authentication
+      - name: Test AWS CLI Authentication
+        run: aws sts get-caller-identity
+
+      # Step 4: Update kubeconfig for EKS access
+      - name: Configure kubectl with EKS
+        run: |
+          aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name ${{ secrets.EKS_CLUSTER_NAME }}
+
+      # Step 5: Verify kubectl Configuration
+      - name: Verify kubectl Configuration
+        run: kubectl config view
+
+      # Step 6: Update aws-auth ConfigMap (Add IAM User to EKS RBAC)
+      - name: Add IAM User to aws-auth ConfigMap
+        run: |
+          kubectl get configmap -n kube-system aws-auth -o yaml > aws-auth.yaml
+          echo "- userarn: arn:aws:iam::390278047930:user/github-actions-deployer" >> aws-auth.yaml
+          echo "  username: github-actions-deployer" >> aws-auth.yaml
+          echo "  groups:" >> aws-auth.yaml
+          echo "    - system:masters" >> aws-auth.yaml
+          kubectl apply -f aws-auth.yaml
+
+      # Step 7: Log in to Amazon ECR
       - name: Log in to Amazon ECR
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
 
-      # Step 7: Build Docker Image
+      # Step 8: Build Docker Image
       # This assumes that the Dockerfile is configured to copy the Spring Boot JAR into the image
       - name: Build Docker Image
         run: |
           docker build -t ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest .
 
-      # Step 8: Push the Docker image to Amazon ECR
+      # Step 9: Push the Docker image to Amazon ECR
       - name: Push Docker Image to ECR
         run: |
           docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
 
-      # Step 9: Update kubeconfig for EKS access
-      - name: Configure kubectl with EKS
-        run: |
-          aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name ${{ secrets.EKS_CLUSTER_NAME }}
-
-      # Step 10: Test kubectl connectivity
+      # Step 10: Test kubectl connectivity to EKS
       - name: Test kubectl connectivity
         run: kubectl get nodes
 
